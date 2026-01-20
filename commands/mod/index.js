@@ -6,7 +6,9 @@ const path = require('path');
 // command
 const data = new SlashCommandBuilder()
     .setName('mod')
-    .setDescription('Moderation commands for jinxing');
+    .setDescription('Moderation commands for jinxing')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .setContexts(0);
 
 const subHandlers = {};
 const subPath = path.join(__dirname, 'sub');
