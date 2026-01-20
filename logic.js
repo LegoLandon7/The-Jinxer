@@ -3,7 +3,6 @@ const path = require('path');
 
 const jinxed = {};
 const messages = {};
-const activeJinxes = {};
 let ignored = {};
 
 function listenMessages(client) {
@@ -18,9 +17,33 @@ function listenMessages(client) {
         // ignore check
         if (ignored[authorId] && ignored[authorId].enabled === true) return;
 
+        // data
         if (!messages[guildId]) messages[guildId] = [];
         if (!jinxed[guildId]) jinxed[guildId] = new Set();
-        if (!activeJinxes[guildId]) activeJinxes[guildId] = new Set();
+
+        // delete message if user is jinxed
+        if (jinxed[guildId].has(authorId)) {
+            try {
+                await message.delete();
+            } catch {}
+        }
+
+        // unjinx if mentioned by someone else
+        if (
+            message.mentions.users.size > 0 &&
+            message.mentions.roles.size === 0 &&
+            !message.mentions.everyone // only mentiom user
+        ) {
+            for (const [mentionedId] of message.mentions.users) {
+                if (jinxed[guildId].has(mentionedId) && mentionedId !== authorId) {
+                    jinxed[guildId].delete(mentionedId);
+
+                    await message.channel.send(
+                        `**${message.author.username}** freed <@${mentionedId}> from the jinx!`
+                    );
+                }
+            }
+        }
 
         // check for repeated messages to jinx
         for (const entry of messages[guildId]) {
@@ -28,12 +51,8 @@ function listenMessages(client) {
                 entry.userId !== authorId &&
                 entry.content === content &&
                 now - entry.date < 2000 &&
-                !jinxed[guildId].has(authorId) &&
-                !activeJinxes[guildId].has(content)
+                !jinxed[guildId].has(authorId)
             ) {
-                // mark this content as active jinx so others won't get it
-                activeJinxes[guildId].add(content);
-
                 // jinx this user
                 jinxed[guildId].add(authorId);
 
@@ -55,34 +74,6 @@ function listenMessages(client) {
 
         // remove old messages
         messages[guildId] = messages[guildId].filter(m => now - m.date < 3000);
-
-        // unjinx if mentioned by someone else
-        if (
-            message.mentions.users.size > 0 &&
-            message.mentions.roles.size === 0 &&
-            !message.mentions.everyone
-        ) {
-            for (const [mentionedId] of message.mentions.users) {
-                if (
-                    jinxed[guildId].has(mentionedId) &&
-                    mentionedId !== authorId
-                ) {
-                    jinxed[guildId].delete(mentionedId);
-                    activeJinxes[guildId].delete(content);
-
-                    await message.channel.send(
-                        `**${message.author.username}** freed <@${mentionedId}> from the jinx!`
-                    );
-                }
-            }
-        }
-
-        // delete message if user is jinxed
-        if (jinxed[guildId].has(authorId)) {
-            try {
-                await message.delete();
-            } catch {}
-        }
     });
 }
 
